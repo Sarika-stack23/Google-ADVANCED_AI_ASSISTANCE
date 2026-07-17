@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 2 — Gemini Integration
+
+#### ✨ New Features
+
+- **Gemini Primary Engine**: Migrated from Groq (LLaMA) to Google Gemini (`gemini-2.0-flash`). Groq remains as an optional fallback when `USE_GEMINI=false`.
+- **SSE Streaming Support**: Added `POST /api/v1/chat/stream` for real-time token-by-token response delivery using FastAPI `StreamingResponse`.
+- **Gemini Vision OCR**: Added `POST /api/v1/vision/extract` endpoint using Gemini Vision to extract mathematical content and solve problems directly from images, replacing Tesseract OCR.
+- **LaTeX Math Support**: Updated system prompt template to use proper LaTeX math mode (`$...$` and `$$...$$`) for all mathematical expressions instead of restricted unicode symbols.
+- Added `.env.example` file for new setup credentials.
+
+#### 🧪 Testing
+- Added `tests/test_gemini.py` to verify text querying, fallback mechanisms, and vision extraction.
+- Total test count increased to 50 passing tests.
+
 ### Phase 1 — Architecture Refactoring
 
 #### 🏗️ Backend Decomposition
