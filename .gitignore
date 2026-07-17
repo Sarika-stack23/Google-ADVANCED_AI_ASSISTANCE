@@ -34,3 +34,13 @@ models/
 temp_*.pdf
 temp_*.png
 tmp_*.pdf
+
+# ── Testing & Coverage ────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# ── Build artifacts ────────────────────────────────────────
+dist/
+build/

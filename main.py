@@ -838,6 +838,69 @@ def ocr_extract_text(image) -> str:
         logger.error(f"OCR error: {e}")
         return ""
 
+def _safe_evaluate_expression(expr_str: str, x_array):
+    """Safely evaluate a mathematical expression string over a numpy array.
+
+    Uses SymPy's sympify() to parse the expression (rejecting arbitrary Python)
+    and lambdify() to convert it to a numpy-callable function. This is safe
+    because sympify() only understands mathematical syntax, not arbitrary code.
+
+    Args:
+        expr_str: Mathematical expression string (e.g., "sin(x)", "x**2 + 1").
+        x_array: numpy array of x values to evaluate the expression over.
+
+    Returns:
+        numpy array of y values.
+
+    Raises:
+        ValueError: If the expression contains disallowed constructs.
+        sympy.SympifyError: If the expression cannot be parsed as math.
+    """
+    import sympy as sp
+    import numpy as np
+
+    # Reject expressions containing dangerous patterns before parsing
+    _BLOCKED_PATTERNS = [
+        "__", "import", "exec", "eval", "compile", "open", "getattr",
+        "setattr", "delattr", "globals", "locals", "vars", "dir",
+        "breakpoint", "exit", "quit", "input", "print", "os.",
+        "sys.", "subprocess", "shutil", "pathlib",
+    ]
+    expr_lower = expr_str.lower().replace(" ", "")
+    for pattern in _BLOCKED_PATTERNS:
+        if pattern in expr_lower:
+            raise ValueError(f"Blocked: expression contains disallowed pattern '{pattern}'")
+
+    # Replace caret with power operator
+    sanitized = re.sub(r'\^', '**', expr_str.strip())
+
+    # Define allowed SymPy symbols and functions for parsing
+    x = sp.Symbol("x")
+    _local_dict = {
+        "x": x, "e": sp.E, "pi": sp.pi,
+        "sin": sp.sin, "cos": sp.cos, "tan": sp.tan,
+        "exp": sp.exp, "log": sp.log, "ln": sp.log,
+        "sqrt": sp.sqrt, "abs": sp.Abs,
+        "arcsin": sp.asin, "arccos": sp.acos, "arctan": sp.atan,
+        "asin": sp.asin, "acos": sp.acos, "atan": sp.atan,
+        "sinh": sp.sinh, "cosh": sp.cosh, "tanh": sp.tanh,
+        "sec": sp.sec, "csc": sp.csc, "cot": sp.cot,
+        "ceiling": sp.ceiling, "floor": sp.floor,
+    }
+
+    # Parse through SymPy — rejects arbitrary Python code
+    sym_expr = sp.sympify(sanitized, locals=_local_dict)
+
+    # Convert to numpy-callable function — safe, no code execution
+    f = sp.lambdify(x, sym_expr, modules=["numpy"])
+    y = f(x_array)
+
+    # Ensure result is array (handles constant expressions like "5" or "pi")
+    if not hasattr(y, "__len__"):
+        y = np.full_like(x_array, float(y))
+
+    return y
+
 
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  STEP 6 — STREAMLIT UI                                              ║
@@ -857,15 +920,6 @@ def render_graph(expression: str, x_range: tuple = (-10, 10), title: str = ""):
         _colors = ["#4f8ef7", "#4ecca3", "#f5c842", "#ff6b6b", "#c792ea"]
 
         x = np.linspace(x_range[0], x_range[1], 1000)
-        ns = {
-            "__builtins__": {},
-            "x": x, "np": np,
-            "sin": np.sin, "cos": np.cos, "tan": np.tan,
-            "exp": np.exp, "log": np.log, "sqrt": np.sqrt,
-            "abs": np.abs, "pi": np.pi, "e": np.e,
-            "arcsin": np.arcsin, "arccos": np.arccos, "arctan": np.arctan,
-            "sinh": np.sinh, "cosh": np.cosh, "tanh": np.tanh,
-        }
 
         fig = go.Figure()
         plotted = 0
@@ -873,7 +927,8 @@ def render_graph(expression: str, x_range: tuple = (-10, 10), title: str = ""):
         for idx, expr in enumerate(expression.split(",")[:5]):
             expr = expr.strip()
             try:
-                y = eval(re.sub(r'\^', '**', expr), ns)
+                # SAFE: uses SymPy sympify+lambdify instead of eval()
+                y = _safe_evaluate_expression(expr, x)
                 y = np.where(np.abs(y) > 1e10, np.nan, y)
                 fig.add_trace(go.Scatter(
                     x=x, y=y,
