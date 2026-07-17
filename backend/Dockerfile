@@ -1,24 +1,30 @@
+# Build stage
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Run stage
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for sentence-transformers and OCR
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy dependencies from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
-COPY src/ ./src/
-COPY ../knowledge_base.py ./knowledge_base.py
+COPY src /app/backend/src
 
-# Non-root user for security
-RUN useradd --create-home appuser && chown -R appuser /app
-USER appuser
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV ENVIRONMENT=production
 
-EXPOSE 8080
+# Cloud Run injects PORT, but default to 8080
+ENV PORT=8080
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
+EXPOSE $PORT
+
+# Start FastAPI application
+CMD ["sh", "-c", "uvicorn backend.src.main:app --host 0.0.0.0 --port ${PORT}"]

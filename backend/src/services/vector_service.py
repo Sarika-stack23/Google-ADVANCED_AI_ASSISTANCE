@@ -137,21 +137,28 @@ class MathVectorStore:
 
 _PIPELINE_CACHE = {}
 
-
-def build_pipeline(pdf_paths=None, urls=None, text_paths=None, force_rebuild=False) -> MathVectorStore:
-    """Build or load the full knowledge base pipeline (cached per process)."""
-    from backend.src.math.knowledge_indexer import MathDataLoader, MathDataPreprocessor, MathTextSplitter
-
+def build_pipeline(force_rebuild=False):
+    """Build or load the knowledge base pipeline."""
+    from backend.src.config import settings
+    
     if "store" in _PIPELINE_CACHE and not force_rebuild:
         return _PIPELINE_CACHE["store"]
-    store = MathVectorStore()
-    if store.is_ready() and not force_rebuild:
-        logger.info(f"Knowledge base already built ({store.get_document_count()} docs).")
+        
+    if getattr(settings, "vector_db", "qdrant") == "qdrant":
+        from backend.src.services.qdrant_service import QdrantService
+        store = QdrantService()
+        if store.get_document_count() == 0 or force_rebuild:
+            from backend.src.math.knowledge_indexer import KnowledgeIndexer
+            indexer = KnowledgeIndexer()
+            indexer.index_all()
         _PIPELINE_CACHE["store"] = store
         return store
-    raw_docs   = MathDataLoader().load_all(pdf_paths=pdf_paths or [], urls=urls or [], text_paths=text_paths or [])
-    clean_docs = MathDataPreprocessor().preprocess_documents(raw_docs)
-    chunks     = MathTextSplitter().split_documents(clean_docs)
-    store.build_knowledge_base(chunks)
-    _PIPELINE_CACHE["store"] = store
-    return store
+    else:
+        # Fallback to Chroma (legacy)
+        store = MathVectorStore()
+        if store.is_ready() and not force_rebuild:
+            logger.info(f"Knowledge base already built ({store.get_document_count()} docs).")
+        else:
+            logger.warning("Chroma build from scratch is deprecated. Please use Qdrant.")
+        _PIPELINE_CACHE["store"] = store
+        return store

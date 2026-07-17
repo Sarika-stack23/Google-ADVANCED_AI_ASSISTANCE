@@ -8,6 +8,103 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 11 — Testing, Documentation & Polish
+
+#### ✨ New Features
+
+- **Documentation**: Rewrote `README.md` for the hackathon showcase and added a comprehensive `docs/ARCHITECTURE.md` file featuring a Mermaid state machine diagram.
+- **E2E Testing**: Integrated Playwright into the frontend and added a baseline `login.spec.ts` UI test.
+- **Integration Tests**: Added `tests/test_integration.py` to ensure core API contracts perform as expected with mocked dependencies.
+- **CI/CD Security**: Added `pip-audit` to the `.github/workflows/ci.yml` pipeline to scan for dependency vulnerabilities on every push.
+- **Demo Script**: Created a 3-minute hackathon demo storyboard to highlight the agentic features.
+
+#### ✨ New Features
+
+- **Modern Architecture**: Fully replaced legacy Streamlit frontend with a high-performance **React 19 + TypeScript + Vite** application.
+- **Premium UI/UX**: Implemented a bespoke design system featuring glassmorphism, responsive grid layouts, and automatic dark/light mode switching based on `prefers-color-scheme`.
+- **Live Streaming & LaTeX**: Integrated an SSE fetch consumer for the `/api/v1/chat/stream` endpoint with real-time `react-latex-next` (KaTeX) rendering of mathematical symbols.
+- **NCERT Quiz Workflow**: Recreated the interactive problem-solving experience with "Give Hint", "Show Steps", "Show Answer", and an intuitive "Stuck? Ask AI" contextual menu.
+- **Progress Tracking**: Built a new `ProgressDashboard` component displaying the user's current streak, accuracy metrics, and an activity heatmap.
+- **Firebase Deployment**: Reconfigured `firebase.json` to deploy the new React Single Page Application (SPA).
+
+#### ✨ New Features
+
+- **MCP Integration**: Created 6 new MCP server tools (`sympy-mcp`, `calculator-mcp`, `graph-plotter-mcp`, `pdf-reader-mcp`, `python-executor-mcp`, `image-solver-mcp`) mapped via a local registry to `mcp-servers/`.
+- **Python Sandbox**: Integrated `RestrictedPython` in `python-executor-mcp` to securely execute inline python code for complex math tasks, while successfully blocking imports like `os` and `subprocess`.
+- **AgentExecutor Update**: Refactored `SolverAgent` (Google ADK) to dynamically use `create_tool_calling_agent` and `AgentExecutor` from LangChain when `USE_MCP=true` is set.
+- **Tools Verification**: Added `test_mcp_servers.py` to end-to-end test the contract and logic of the 6 tools locally.
+
+#### ✨ New Features
+
+- **Dockerization**: Created a production-ready `Dockerfile` to containerize the FastAPI backend for Cloud Run.
+- **CI/CD Pipelines**: Added GitHub Actions workflows:
+  - `ci.yml`: Runs tests automatically on pull requests to `main`.
+  - `deploy.yml`: Authenticates with Google Cloud, builds the Docker image, and deploys to Cloud Run on pushes to `main`.
+- **Firebase Hosting**: Scaffolded `firebase.json` and a placeholder `index.html` to serve static frontend assets.
+- **DDoS Protection**: Integrated `slowapi` to enforce a strict 20 requests/minute rate limit on all chat/vision API endpoints to protect the free tier from abuse.
+- **Secret Management**: Removed reliance on local `.env` files for deployment by utilizing Google Cloud Secret Manager and GitHub Actions secrets.
+
+#### ✨ New Features
+
+- **Firestore Prompt Versioning**: Created `PromptService` to dynamically load the system prompt template from Firestore (`prompts` collection).
+- **A/B Testing & Active Versioning**: `PromptService` supports passing an `ab_test_group` string to pull variations, and an `active_version` pointer inside the Firestore document to smoothly update prompts without code deployment.
+- **Local Fallback**: Designed to fail open — if Firestore is unreachable, the API instantly falls back to a hardcoded local template to ensure zero downtime.
+- **Safety Filters**: Updated `GeminiService` to use the newer `google.genai` SDK and activated `SafetySetting` filters against Harassment, Hate Speech, Dangerous Content, and Sexually Explicit queries using the Gemini standard built-in thresholds.
+- **Offline LLM-as-Judge Evaluation**: Created `EvaluationService` using `gemini-2.5-flash` to evaluate RAG answer quality on a scale of 1-5 with deterministic reasoning output.
+- **Cloud Logging**: Appended `google-cloud-logging` to dependencies and integrated structured cloud logging inside `config.py` when a GCP environment or Application Default Credentials (ADC) are detected, while gracefully falling back to standard stdout logging locally.
+
+#### ✨ New Features
+
+- **Qdrant Vector Database**: Replaced ChromaDB and FAISS with Qdrant Cloud. Qdrant is natively supported in `:memory:` mode for testing and local usage without an API key.
+- **Hybrid Search**: Configured `QdrantVectorStore` with `RetrievalMode.HYBRID`, fusing dense vectors (`text-embedding-004` via Gemini API) and sparse vectors (`fastembed` BM25).
+- **Markdown Knowledge Base**: Migrated the monolithic 6000-line `knowledge_base.py` into 201 individual structured Markdown files in the `knowledge-base/` directory, allowing cleaner git tracking and easier manual updates.
+- **Dynamic Metadata Filtering**: Configured Qdrant's payload filters so RAG can accurately filter documents by `class_level`, `chapter`, and `topic`.
+
+#### 🧪 Testing
+- Passed all existing RAG and Chunking tests.
+- Added `test_qdrant.py` mocking the new `QdrantService` initialization and sparse/dense retrieval paths.
+- Total tests passed: 62.
+
+#### ✨ New Features
+
+- **LangGraph StateGraph Integration**: Added `langgraph` and `langsmith` to wrap the Phase 4 ADK agents into a formal state machine (`math_graph.py`).
+- **Parallel Retrieval**: The `retrieve_rag` and `retrieve_memory` nodes now run concurrently, optimizing retrieval latency.
+- **Verification Retry Loop**: The `should_retry` conditional edge enforces a self-correction loop, prompting the solver to fix its mistakes up to 2 times if the verifier detects an error.
+- **Observable Tracing**: LangSmith is fully supported. When `LANGCHAIN_API_KEY` is provided, every state mutation and token generation is logged to the dashboard.
+- **Configurable Pipeline**: The API path is controlled by `USE_LANGGRAPH=True`, allowing graceful fallback to the ADK orchestrator or the original single-agent pipeline.
+
+#### 🧪 Testing
+- Added `tests/test_langgraph.py` to verify proper conditional edge routing (e.g. testing that failures loop back to the solver).
+- Total tests passed: 59.
+
+#### ✨ New Features
+
+- **Multi-Agent Architecture**: Replaced the monolithic `MathAIEngine` with a 5-agent pipeline orchestrated by Google ADK (`google-adk==0.1.0`).
+- **Planner Agent**: Classifies incoming queries by math topic and educational class level for targeted responses.
+- **Memory Agent**: Interfaces directly with Firestore to fetch chat history and analyzes weak topics from the user's profile to adapt explanations.
+- **Solver Agent**: Executes RAG retrieval and symbolic computation (SymPy) to construct the core mathematical solution.
+- **Verifier Agent**: Automatically audits the Solver's output for mathematical or logical errors (e.g., catching `4+4=9`), triggering an internal retry if verification fails.
+- **Formatter Agent**: Applies strict output templates, formatting solutions with teacher reactions, emojis, and LaTeX math mode.
+- **Human Feedback Loop**: Added `save_user_feedback` API to Firestore for reinforcement learning data collection.
+
+#### 🧪 Testing
+- Added `tests/test_adk_agents.py` with mock ADK environments to unit-test Planner classification, Verifier error detection, and Memory topic retrieval.
+- Total test count increased to 57 passing tests.
+
+### Phase 3 — Firebase Integration
+
+#### ✨ New Features
+
+- **Firebase Authentication**: Protected all endpoints with `firebase_admin` ID token verification middleware. Added support for Google Sign-In backend verification.
+- **Firestore Persistence**: Completely removed MongoDB (`pymongo`, `motor`) and migrated chat memory persistent storage to Google Cloud Firestore.
+- **User Isolation**: Chat history is now tightly scoped to authenticated user IDs to prevent data leakage across sessions.
+- **Progress Tracking API**: Added `/api/v1/progress` endpoints to track and persist daily streaks and total problems solved per user.
+- **Security Rules**: Deployed `firestore.rules` to ensure strict row-level security for user data.
+
+#### 🧪 Testing
+- Added `tests/test_firebase.py` to verify authentication middleware logic and mock Firestore queries.
+- Total test count increased to 54 passing tests.
+
 ### Phase 2 — Gemini Integration
 
 #### ✨ New Features

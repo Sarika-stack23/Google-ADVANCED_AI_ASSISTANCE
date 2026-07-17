@@ -7,47 +7,54 @@ Provides:
 - Streaming support for token-by-token SSE delivery
 - Automatic fallback from Gemini 2.0 Flash → Gemini 1.5 Flash on rate limits
 
-Uses Google AI Studio free tier (google-generativeai SDK).
+Uses Google AI Studio free tier via the google-genai SDK.
 """
 
-import re
 import time
 import logging
-import base64
 from typing import Dict, Any, Optional, AsyncGenerator
 
-from backend.src.config import settings, SYSTEM_TEMPLATE
+from backend.src.config import settings
+from backend.src.services.prompt_service import PromptService
 
 logger = logging.getLogger("math_assistant.gemini")
 
-_GEMINI_CACHE = {}
+_GEMINI_CLIENT = None
 
-
-def _get_gemini_model(model_name: str = None):
-    """Get or create a cached Gemini GenerativeModel instance.
-
-    Uses google-generativeai SDK (Google AI Studio free tier).
-    """
-    import google.generativeai as genai
-
-    model_name = model_name or settings.gemini_primary_model
-    if model_name not in _GEMINI_CACHE:
+def _get_gemini_client():
+    global _GEMINI_CLIENT
+    if _GEMINI_CLIENT is None:
+        from google import genai
         api_key = settings.gemini_api_key
         if not api_key:
             raise ValueError(
                 "GEMINI_API_KEY not set. Get a free key at https://aistudio.google.com/apikey "
                 "and add it to your .env file."
             )
-        genai.configure(api_key=api_key)
-        _GEMINI_CACHE[model_name] = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config=genai.GenerationConfig(
-                temperature=settings.gemini_temperature,
-                max_output_tokens=settings.gemini_max_tokens,
-            ),
-        )
-        logger.info(f"Initialized Gemini model: {model_name}")
-    return _GEMINI_CACHE[model_name]
+        _GEMINI_CLIENT = genai.Client(api_key=api_key)
+        logger.info("Initialized google-genai Client")
+    return _GEMINI_CLIENT
+
+def _get_safety_settings():
+    from google.genai import types
+    return [
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        ),
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        ),
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        ),
+        types.SafetySetting(
+            category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold=types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+        ),
+    ]
 
 
 class GeminiService:
@@ -56,19 +63,14 @@ class GeminiService:
     def __init__(self):
         self.primary_model = settings.gemini_primary_model
         self.fallback_model = settings.gemini_fallback_model
+        self.prompt_service = PromptService()
 
     def query(self, user_input: str, context: str = "", chat_history: list = None) -> str:
-        """Send a math query to Gemini and return the response.
-
-        Args:
-            user_input: The student's math question.
-            context: RAG-retrieved knowledge base context.
-            chat_history: List of previous messages for context.
-
-        Returns:
-            The LLM response string.
-        """
-        system_text = SYSTEM_TEMPLATE.replace("{context}", context or "")
+        """Send a math query to Gemini and return the response."""
+        from google.genai import types
+        
+        system_template = self.prompt_service.get_system_prompt()
+        system_text = system_template.replace("{context}", context or "")
 
         # Build conversation parts
         parts = [system_text + "\n\n"]
@@ -82,15 +84,24 @@ class GeminiService:
 
         prompt = "".join(parts)
 
-        # Try primary model, then fallback
         models_to_try = [self.primary_model, self.fallback_model]
         last_error = None
+        client = _get_gemini_client()
+
+        config = types.GenerateContentConfig(
+            temperature=settings.gemini_temperature,
+            max_output_tokens=settings.gemini_max_tokens,
+            safety_settings=_get_safety_settings()
+        )
 
         for model_name in models_to_try:
-            model = _get_gemini_model(model_name)
             for attempt in range(2):
                 try:
-                    response = model.generate_content(prompt)
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config
+                    )
 
                     if response.text:
                         answer = response.text.strip()
@@ -98,10 +109,7 @@ class GeminiService:
                             answer = f"*(Using fallback: {model_name})*\n\n" + answer
                         return answer
                     else:
-                        # Check for blocked content
-                        if response.prompt_feedback and response.prompt_feedback.block_reason:
-                            raise Exception(f"Content blocked: {response.prompt_feedback.block_reason}")
-                        raise Exception("Empty response from Gemini")
+                        raise Exception("Empty response or content blocked by safety filters.")
 
                 except Exception as e:
                     last_error = e
@@ -118,16 +126,16 @@ class GeminiService:
                     else:
                         break  # Non-retryable
 
-        # All models failed
         logger.error(f"All Gemini models failed: {last_error}")
         return f"⚠️ Gemini API error: {last_error}"
 
     async def stream(self, user_input: str, context: str = "", chat_history: list = None) -> AsyncGenerator[str, None]:
-        """Stream a response token by token for SSE delivery.
-
-        Yields chunks of text as they arrive from Gemini's streaming API.
-        """
-        system_text = SYSTEM_TEMPLATE.replace("{context}", context or "")
+        """Stream a response token by token for SSE delivery."""
+        from google.genai import types
+        
+        system_template = self.prompt_service.get_system_prompt()
+        system_text = system_template.replace("{context}", context or "")
+        
         parts = [system_text + "\n\n"]
         if chat_history:
             for msg in chat_history:
@@ -138,10 +146,20 @@ class GeminiService:
         parts.append(f"Student: {user_input}\nTeacher: ")
         prompt = "".join(parts)
 
-        model = _get_gemini_model(self.primary_model)
+        client = _get_gemini_client()
+        config = types.GenerateContentConfig(
+            temperature=settings.gemini_temperature,
+            max_output_tokens=settings.gemini_max_tokens,
+            safety_settings=_get_safety_settings()
+        )
+
         try:
-            response = model.generate_content(prompt, stream=True)
-            for chunk in response:
+            response_stream = client.models.generate_content_stream(
+                model=self.primary_model,
+                contents=prompt,
+                config=config
+            )
+            for chunk in response_stream:
                 if chunk.text:
                     yield chunk.text
         except Exception as e:
@@ -150,24 +168,14 @@ class GeminiService:
 
 
 class GeminiVisionService:
-    """Gemini Vision for extracting math from images (replaces Tesseract OCR)."""
+    """Gemini Vision for extracting math from images."""
 
     def __init__(self):
         self.model_name = settings.gemini_vision_model
 
     def extract_math_from_image(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
-        """Extract mathematical content from an image using Gemini Vision.
-
-        Args:
-            image_bytes: Raw image bytes.
-            mime_type: Image MIME type (image/jpeg, image/png, etc.).
-
-        Returns:
-            Extracted mathematical expression or problem text.
-        """
-        import google.generativeai as genai
-
-        model = _get_gemini_model(self.model_name)
+        from google.genai import types
+        client = _get_gemini_client()
 
         prompt = (
             "You are a math OCR expert. Extract ALL mathematical content from this image.\n\n"
@@ -180,11 +188,16 @@ class GeminiVisionService:
             "6. Return ONLY the extracted math — no commentary.\n"
         )
 
+        config = types.GenerateContentConfig(safety_settings=_get_safety_settings())
         try:
-            response = model.generate_content([
-                prompt,
-                {"mime_type": mime_type, "data": image_bytes},
-            ])
+            response = client.models.generate_content(
+                model=self.model_name,
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                ],
+                config=config
+            )
             if response.text:
                 return response.text.strip()
             return "Could not extract math from image."
@@ -193,13 +206,8 @@ class GeminiVisionService:
             return f"Vision error: {e}"
 
     def extract_and_solve(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> Dict[str, str]:
-        """Extract math from image and solve it in one call.
-
-        Returns dict with 'extracted' (the raw math) and 'solution' (step-by-step).
-        """
-        import google.generativeai as genai
-
-        model = _get_gemini_model(self.model_name)
+        from google.genai import types
+        client = _get_gemini_client()
 
         prompt = (
             "You are an Indian math teacher. Look at this image.\n\n"
@@ -211,14 +219,18 @@ class GeminiVisionService:
             "SOLUTION:\n[step-by-step solution]\n"
         )
 
+        config = types.GenerateContentConfig(safety_settings=_get_safety_settings())
         try:
-            response = model.generate_content([
-                prompt,
-                {"mime_type": mime_type, "data": image_bytes},
-            ])
+            response = client.models.generate_content(
+                model=self.model_name,
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                ],
+                config=config
+            )
             text = response.text.strip() if response.text else ""
 
-            # Parse response
             if "EXTRACTED:" in text and "SOLUTION:" in text:
                 parts = text.split("---", 1)
                 extracted = parts[0].replace("EXTRACTED:", "").strip()

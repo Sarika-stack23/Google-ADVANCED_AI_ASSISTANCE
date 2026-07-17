@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Ensure all requests are authenticated
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Users can only read/write their own document and subcollections
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+      
+      match /sessions/{sessionId}/messages/{messageId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      match /profile/{docId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+  }
+}

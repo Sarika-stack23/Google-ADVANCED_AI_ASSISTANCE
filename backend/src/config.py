@@ -55,10 +55,22 @@ class Settings(BaseSettings):
     chunk_overlap: int = 200
     collection_name: str = "math_knowledge_base"
 
-    # ── MongoDB (Chat Memory) ──────────────────────────────────────────
-    mongodb_uri: str = ""
-    mongodb_db_name: str = "math_assistant"
-    mongodb_collection: str = "chat_history"
+    # ── Firebase ───────────────────────────────────────────────────────
+    use_firebase: bool = True
+    firebase_credentials_path: str = ""
+
+    # ── ADK Multi-Agent ────────────────────────────────────────────────
+    use_adk: bool = True
+
+    # ── LangGraph ──────────────────────────────────────────────────────
+    use_langgraph: bool = True
+    langchain_api_key: str = ""
+
+    # ── Vector DB ──────────────────────────────────────────────────────
+    vector_db: str = "qdrant"
+    qdrant_url: str = ":memory:"
+    qdrant_api_key: str = ""
+
 
     # ── Server ─────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
@@ -69,6 +81,34 @@ class Settings(BaseSettings):
 
 # Singleton settings instance
 settings = Settings()
+
+def setup_logging():
+    import logging
+    import os
+    
+    # Check if running in a GCP environment (Cloud Run, App Engine) or has ADC setup
+    use_cloud_logging = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT")
+    
+    if use_cloud_logging:
+        try:
+            import google.cloud.logging
+            client = google.cloud.logging.Client()
+            client.setup_logging()
+            logging.info("Google Cloud Logging integrated successfully.")
+            return
+        except ImportError:
+            logging.warning("google-cloud-logging not installed. Falling back to standard logging.")
+        except Exception as e:
+            logging.warning(f"Failed to initialize Cloud Logging: {e}. Falling back to standard logging.")
+            
+    # Standard local logging fallback
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+
+# Initialize logging when config is imported
+setup_logging()
 
 
 # ── System Prompt Template ─────────────────────────────────────────────

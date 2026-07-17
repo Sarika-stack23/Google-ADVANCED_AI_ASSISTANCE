@@ -12,17 +12,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from main import MathDataLoader
+from backend.src.math.knowledge_indexer import KnowledgeIndexer
 
 
 class TestDataSources(unittest.TestCase):
     """Verify NCERT knowledge base loading produces valid Document objects."""
 
     def test_builtin_knowledge(self):
-        """Knowledge base must return non-empty documents with topic metadata."""
-        docs = MathDataLoader().load_builtin_knowledge()
+        """Test loading builtin knowledge from markdown files."""
+        indexer = KnowledgeIndexer()
+        docs = indexer.load_markdown_files()
         self.assertGreater(len(docs), 0)
-        self.assertTrue(all(len(d.page_content) > 50 for d in docs))
-        self.assertTrue(all("topic" in d.metadata for d in docs))
+        for doc in docs:
+            self.assertIn("topic", doc.metadata)
+            self.assertGreater(len(doc.page_content), 50)
 
 
 if __name__ == "__main__":

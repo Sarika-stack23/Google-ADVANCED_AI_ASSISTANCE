@@ -16,7 +16,6 @@ import os, re, sys, json, time, uuid, hashlib, logging, argparse, unittest, ast,
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from knowledge_base import MATH_KNOWLEDGE_BASE, CLASS_EXAMPLES
 from dotenv import load_dotenv
 # Load .env locally — works regardless of launch directory
 load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
@@ -82,8 +81,8 @@ class MathDataLoader:
         self.documents = []
 
     def load_builtin_knowledge(self):
-        logger.info(f"Loading {len(MATH_KNOWLEDGE_BASE)} built-in knowledge documents")
-        return list(MATH_KNOWLEDGE_BASE)
+        logger.info("Loading knowledge from Markdown (Fallback)")
+        return []
 
     def load_pdf(self, pdf_path: str):
         try:

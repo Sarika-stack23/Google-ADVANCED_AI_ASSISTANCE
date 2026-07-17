@@ -1,8 +1,9 @@
 """
-Chat Memory Service — MongoDB-backed persistent chat history.
+Chat Memory Service — Firestore-backed persistent chat history.
 
-Extracted from main.py L525-L582. Provides per-session chat history
-with MongoDB persistence and in-memory fallback when MongoDB is unavailable.
+Provides per-session chat history with Firestore persistence and
+in-memory fallback when Firestore is unavailable.
+Replaces the MongoDB implementation from Phase 1.
 """
 
 import logging
@@ -10,6 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Dict
 
 from backend.src.config import settings
+from backend.src.services.firebase_service import get_firestore_client
 
 try:
     from langchain_core.messages import HumanMessage, AIMessage
@@ -19,56 +21,59 @@ except ImportError:
 logger = logging.getLogger("math_assistant.memory")
 
 
-class MongoDBChatMemory:
-    """Per-session chat memory with MongoDB persistence and in-memory fallback."""
+class FirestoreChatMemory:
+    """Per-session chat memory with Firestore persistence and in-memory fallback."""
 
-    def __init__(self, session_id: str = "default"):
+    def __init__(self, uid: str = "anonymous", session_id: str = "default"):
+        self.uid = uid
         self.session_id = session_id
-        self.collection = None
         self._memory: List[Dict] = []
-        self._connect()
+        self.db = get_firestore_client()
 
-    def _connect(self):
-        if not settings.mongodb_uri:
-            return
-        try:
-            from pymongo import MongoClient
-            client = MongoClient(settings.mongodb_uri, serverSelectionTimeoutMS=5000)
-            client.admin.command("ping")
-            self.collection = client[settings.mongodb_db_name][settings.mongodb_collection]
-            logger.info("MongoDB connected")
-        except Exception as e:
-            logger.warning(f"MongoDB unavailable ({e}), using in-memory history")
+    def _get_collection_ref(self):
+        """Get a reference to the session's messages subcollection."""
+        if not self.db:
+            return None
+        return self.db.collection("users").document(self.uid).collection("sessions").document(self.session_id).collection("messages")
 
     def add_message(self, role: str, content: str):
         """Add a message to chat history."""
         msg = {
-            "session_id": self.session_id,
             "role": role,
             "content": content,
             "timestamp": datetime.now(timezone.utc),
         }
-        if self.collection is not None:
+        
+        col_ref = self._get_collection_ref()
+        if col_ref is not None:
             try:
-                self.collection.insert_one(msg)
+                col_ref.add(msg)
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to add message to Firestore: {e}")
+
+        # Fallback to in-memory
+        msg["session_id"] = self.session_id
         self._memory.append(msg)
 
     def get_history(self, limit: int = 20) -> List[Dict]:
         """Retrieve recent chat history for this session."""
-        if self.collection is not None:
+        col_ref = self._get_collection_ref()
+        if col_ref is not None:
             try:
-                msgs = list(
-                    self.collection.find({"session_id": self.session_id})
-                    .sort("timestamp", -1)
+                from firebase_admin import firestore
+                docs = (
+                    col_ref.order_by("timestamp", direction=firestore.Query.DESCENDING)
                     .limit(limit)
+                    .stream()
                 )
+                msgs = [doc.to_dict() for doc in docs]
                 msgs.reverse()
                 return msgs
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to get history from Firestore: {e}")
+
+        # Fallback to in-memory
         return self._memory[-limit:]
 
     def get_langchain_messages(self, limit: int = 10):
@@ -76,17 +81,29 @@ class MongoDBChatMemory:
         history = self.get_history(limit)
         result = []
         for msg in history:
-            if msg["role"] == "human":
-                result.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "assistant":
-                result.append(AIMessage(content=msg["content"]))
+            if msg.get("role") == "human":
+                result.append(HumanMessage(content=msg.get("content", "")))
+            elif msg.get("role") == "assistant":
+                result.append(AIMessage(content=msg.get("content", "")))
         return result
 
     def clear_history(self):
         """Clear all messages for this session."""
-        if self.collection is not None:
+        col_ref = self._get_collection_ref()
+        if col_ref is not None:
             try:
-                self.collection.delete_many({"session_id": self.session_id})
-            except Exception:
-                pass
+                docs = col_ref.limit(500).stream()
+                batch = self.db.batch()
+                count = 0
+                for doc in docs:
+                    batch.delete(doc.reference)
+                    count += 1
+                if count > 0:
+                    batch.commit()
+            except Exception as e:
+                logger.error(f"Failed to clear history in Firestore: {e}")
+
         self._memory.clear()
+
+# Maintain backward compatibility name for the MathAIEngine import during transition
+MongoDBChatMemory = FirestoreChatMemory

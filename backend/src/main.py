@@ -13,7 +13,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.src.config import settings
-from backend.src.api.v1.chat import router as chat_router
+from backend.src.services.firebase_service import init_firebase
+from backend.src.api.v1 import chat
+from backend.src.api.v1 import progress
 
 # ── Logging Setup ──────────────────────────────────────────────────────
 logging.basicConfig(
@@ -31,6 +33,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"   Environment: {settings.environment}")
     logger.info(f"   LLM Model: {settings.llm_model}")
     logger.info(f"   Vector DB: {settings.vector_db_type}")
+
+    # Initialize Firebase Admin SDK
+    init_firebase()
 
     # Pre-build knowledge base on startup (optional, lazy by default)
     # Uncomment the following to eagerly build on startup:
@@ -53,6 +58,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from backend.src.api.limiter import limiter, _rate_limit_exceeded_handler, RateLimitExceeded
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
 # ── CORS Middleware ────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
@@ -67,7 +77,8 @@ app.add_middleware(
 )
 
 # ── Routes ─────────────────────────────────────────────────────────────
-app.include_router(chat_router)
+app.include_router(chat.router)
+app.include_router(progress.router)
 
 
 @app.get("/health")

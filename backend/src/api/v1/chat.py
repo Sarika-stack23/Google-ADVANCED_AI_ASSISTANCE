@@ -8,7 +8,7 @@ through the MathAIEngine (RAG + symbolic math + LLM with fallback).
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,10 @@ from backend.src.services.llm_service import MathAIEngine
 from backend.src.services.vector_service import build_pipeline
 from backend.src.services.gemini_service import GeminiVisionService
 from backend.src.config import settings
+from backend.src.api.middleware.auth import verify_firebase_token
+from backend.src.api.limiter import limiter
+from backend.src.agents.orchestrator import ADKOrchestrator
+from backend.src.graph.math_graph import math_graph
 
 logger = logging.getLogger("math_assistant.api.chat")
 
@@ -55,7 +59,8 @@ class VisionResponse(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────────
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+@limiter.limit("20/minute")
+async def chat(request: Request, payload: ChatRequest, uid: str = Depends(verify_firebase_token)):
     """Process a math question and return a step-by-step solution.
 
     The query flows through:
@@ -65,17 +70,40 @@ async def chat(request: ChatRequest):
     4. LLM call with automatic model fallback
     """
     try:
-        store = build_pipeline()
-        engine = MathAIEngine(vector_store=store, session_id=request.session_id)
-        result = engine.query(request.query)
-        return ChatResponse(**result)
+        if getattr(settings, "use_langgraph", False):
+            # Phase 5: LangGraph Path
+            initial_state = {
+                "user_query": payload.query,
+                "uid": uid,
+                "session_id": payload.session_id,
+                "retries": 0
+            }
+            final_state = math_graph.invoke(initial_state)
+            return ChatResponse(
+                answer=final_state.get("final_answer", "Error generating response."),
+                session_id=payload.session_id,
+                is_adk=True
+            )
+        elif settings.use_adk:
+            # Phase 4: ADK Orchestrator Path
+            orchestrator = ADKOrchestrator(uid=uid, session_id=payload.session_id)
+            result = orchestrator.query(payload.query)
+            return ChatResponse(**result)
+        else:
+            # Legacy Phase 2/3 path
+            store = build_pipeline()
+            engine = MathAIEngine(vector_store=store, session_id=payload.session_id)
+            engine.memory.uid = uid
+            result = engine.query(payload.query)
+            return ChatResponse(**result)
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+@limiter.limit("20/minute")
+async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends(verify_firebase_token)):
     """Stream a math solution token-by-token using SSE.
     
     Requires USE_GEMINI=true to function correctly.
@@ -89,19 +117,20 @@ async def chat_stream(request: ChatRequest):
     try:
         # We manually orchestrate the context retrieval for streaming
         store = build_pipeline()
-        engine = MathAIEngine(vector_store=store, session_id=request.session_id)
+        engine = MathAIEngine(vector_store=store, session_id=payload.session_id)
+        engine.memory.uid = uid
         
         # 1. Get context and history
-        source_docs, context = engine._retrieve_context(request.query)
+        source_docs, context = engine._retrieve_context(payload.query)
         chat_history = engine.memory.get_langchain_messages(limit=4)
-        engine.memory.add_message("human", request.query)
+        engine.memory.add_message("human", payload.query)
 
         gemini = GeminiService()
 
         async def generate():
             full_response = ""
             try:
-                async for chunk in gemini.stream(request.query, context=context, chat_history=chat_history):
+                async for chunk in gemini.stream(payload.query, context=context, chat_history=chat_history):
                     full_response += chunk
                     # Format as SSE
                     yield f"data: {chunk}\n\n"
@@ -122,7 +151,8 @@ async def chat_stream(request: ChatRequest):
 
 
 @router.post("/vision/extract", response_model=VisionResponse)
-async def extract_math_from_image(file: UploadFile = File(...), solve: bool = Form(False)):
+@limiter.limit("20/minute")
+async def extract_math_from_image(request: Request, file: UploadFile = File(...), solve: bool = Form(False), uid: str = Depends(verify_firebase_token)):
     """Extract math from an uploaded image using Gemini Vision."""
     if not settings.use_gemini:
         raise HTTPException(status_code=400, detail="Vision extraction requires Gemini API.")
@@ -147,10 +177,11 @@ async def extract_math_from_image(file: UploadFile = File(...), solve: bool = Fo
 
 
 @router.get("/history/{session_id}", response_model=HistoryResponse)
-async def get_history(session_id: str):
+async def get_history(session_id: str, uid: str = Depends(verify_firebase_token)):
     """Get chat history for a given session."""
     try:
         engine = MathAIEngine(session_id=session_id)
+        engine.memory.uid = uid
         history = engine.get_history()
         # Convert MongoDB ObjectId to string for JSON serialization
         messages = []
@@ -167,10 +198,11 @@ async def get_history(session_id: str):
 
 
 @router.delete("/history/{session_id}")
-async def clear_history(session_id: str):
+async def clear_history(session_id: str, uid: str = Depends(verify_firebase_token)):
     """Clear chat history for a given session."""
     try:
         engine = MathAIEngine(session_id=session_id)
+        engine.memory.uid = uid
         engine.clear_memory()
         return {"status": "ok", "message": f"History cleared for session {session_id}"}
     except Exception as e:
