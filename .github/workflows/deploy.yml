@@ -1,9 +1,19 @@
 name: Deploy to Cloud Run & Firebase
 
+# ──────────────────────────────────────────────────────────────────────
+# This workflow deploys the application to GCP.
+# It requires the following GitHub Secrets to be configured:
+#   - GCP_PROJECT_ID
+#   - WIF_PROVIDER  (Workload Identity Federation provider)
+#   - WIF_SERVICE_ACCOUNT
+#   - FIREBASE_SERVICE_ACCOUNT
+#
+# It only runs on manual dispatch so it won't fail on every push
+# when secrets are not yet configured.
+# ──────────────────────────────────────────────────────────────────────
+
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:   # Manual trigger only
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -61,7 +71,18 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install and Build Frontend
+      working-directory: ./frontend
+      run: |
+        npm install --legacy-peer-deps
+        npm run build
+
     - name: Deploy to Firebase Hosting
       uses: FirebaseExtended/action-hosting-deploy@v0
       with:
