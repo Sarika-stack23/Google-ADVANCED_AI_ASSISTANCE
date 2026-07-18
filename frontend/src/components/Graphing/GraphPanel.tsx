@@ -43,23 +43,64 @@ export const GraphPanel: React.FC = () => {
     <div className="main-content" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', width: '100%', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <h2 style={{ marginBottom: '1.5rem' }}>📈 Interactive Graphing</h2>
       
-      <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <label style={{ fontWeight: 'bold' }}>f(x) = </label>
-          <input 
-            type="text" 
-            className="input" 
-            style={{ flex: 1 }}
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            placeholder="e.g. x^2 + 2x - 1, sin(x), log(x)"
-          />
-          <button type="submit" className="btn btn-primary">Plot</button>
-        </form>
-        {error && <p style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.9rem' }}>{error}</p>}
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-          Try entering expressions using `x` as the variable. Examples: `x^3 - x`, `cos(x) * 2`, `sqrt(x)`.
-        </p>
+      <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '300px' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Graphing</h3>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <label style={{ fontWeight: 'bold' }}>f(x) = </label>
+            <input 
+                type="text" 
+                className="input" 
+                style={{ flex: 1 }}
+                value={inputVal}
+                onChange={(e) => setInputVal(e.target.value)}
+                placeholder="e.g. x^2 + 2x - 1"
+            />
+            <button type="submit" className="btn btn-primary">Plot</button>
+            </form>
+            {error && <p style={{ color: '#ef4444', marginTop: '0.5rem', fontSize: '0.9rem' }}>{error}</p>}
+        </div>
+        <div style={{ flex: 1, minWidth: '300px', borderLeft: '1px solid var(--border)', paddingLeft: '1rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>⚡ Symbolic Compute</h3>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-outline" onClick={async () => {
+                    try {
+                        const res = await fetch('http://localhost:8080/api/v1/symbolic', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ expression: expression, operation: 'differentiate' })
+                        });
+                        const data = await res.json();
+                        alert(`Derivative: ${data.result}`);
+                    } catch (e) { alert('Error computing derivative'); }
+                }}>d/dx</button>
+                <button className="btn btn-outline" onClick={async () => {
+                    try {
+                        const res = await fetch('http://localhost:8080/api/v1/symbolic', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ expression: expression, operation: 'integrate' })
+                        });
+                        const data = await res.json();
+                        alert(`Integral: ${data.result}`);
+                    } catch (e) { alert('Error computing integral'); }
+                }}>∫ dx</button>
+                <button className="btn btn-outline" onClick={async () => {
+                    try {
+                        const res = await fetch('http://localhost:8080/api/v1/symbolic', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ expression: expression, operation: 'solve' })
+                        });
+                        const data = await res.json();
+                        alert(`Roots (f(x)=0): ${data.result}`);
+                    } catch (e) { alert('Error finding roots'); }
+                }}>Solve f(x)=0</button>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                Computes exact symbolic math for the current `f(x)` function using SymPy.
+            </p>
+        </div>
       </div>
 
       <div className="glass" style={{ flex: 1, padding: '1rem', minHeight: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

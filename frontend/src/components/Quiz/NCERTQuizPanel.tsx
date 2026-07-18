@@ -208,10 +208,10 @@ export const NCERTQuizPanel: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        <button className="btn btn-outline" onClick={() => handleAction('give me a hint')} disabled={isLoading || !displayQuestion}>Give me a hint</button>
-        <button className="btn btn-outline" onClick={() => handleAction('show first step')} disabled={isLoading || !displayQuestion}>Show first step</button>
-        <button className="btn btn-outline" onClick={() => handleAction('answer')} disabled={isLoading || !displayQuestion}>Show answer</button>
-        <button className="btn btn-primary" onClick={() => setState(prev => ({ ...prev, showStuckMenu: !prev.showStuckMenu }))} disabled={!displayQuestion}>Ask AI (Stuck?)</button>
+        <button className="btn btn-outline" onClick={() => handleAction('Give me a small hint to start solving this')} disabled={isLoading || !displayQuestion}>💡 Hint</button>
+        <button className="btn btn-outline" onClick={() => handleAction('Show me the first step to solve this')} disabled={isLoading || !displayQuestion}>📖 Steps</button>
+        <button className="btn btn-primary" onClick={() => handleAction('Show me the full answer for this')} disabled={isLoading || !displayQuestion}>✅ Answer</button>
+        <button className="btn btn-outline" onClick={() => setState(prev => ({ ...prev, showStuckMenu: !prev.showStuckMenu }))} disabled={!displayQuestion}>❓ Ask AI</button>
       </div>
 
       {state.showStuckMenu && (
@@ -228,10 +228,24 @@ export const NCERTQuizPanel: React.FC = () => {
 
       {state.feedback && (
         <div className="glass animate-fade-in" style={{ padding: '1.5rem', backgroundColor: 'hsla(var(--accent-primary), 0.1)', border: '1px solid hsla(var(--accent-primary), 0.2)', marginBottom: '3rem' }}>
-          <h4 style={{ marginBottom: '1rem' }}>AI Response</h4>
-          <div style={{ lineHeight: '1.6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+             <h4>AI Response</h4>
+             <button title="Copy Solution" onClick={() => navigator.clipboard.writeText(state.feedback)} style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.6, cursor: 'pointer' }}>
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+             </button>
+          </div>
+          <div className="handwritten-math">
             <Latex>{state.feedback}</Latex>
           </div>
+          
+          {!isLoading && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+               <button className="btn btn-outline" onClick={() => handleAction("I understood it, thanks!")} style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}>✅ Yes, got it!</button>
+               <button className="btn btn-outline" onClick={() => handleAction("I still have a doubt, can you explain further?")} style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}>❓ I have a doubt</button>
+               <button className="btn btn-outline" onClick={() => handleAction("Can you explain this differently?")} style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}>🔁 Explain differently</button>
+               <button className="btn btn-outline" onClick={() => handleAction("Show me the full step-by-step answer")} style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}>✅ Full Answer</button>
+            </div>
+          )}
         </div>
       )}
     </div>

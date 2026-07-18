@@ -16,6 +16,8 @@ from backend.src.config import settings
 from backend.src.services.firebase_service import init_firebase
 from backend.src.api.v1 import chat
 from backend.src.api.v1 import progress
+from backend.src.api.v1 import documents
+from backend.src.api.v1 import symbolic
 
 # ── Logging Setup ──────────────────────────────────────────────────────
 logging.basicConfig(
@@ -79,6 +81,8 @@ app.add_middleware(
 # ── Routes ─────────────────────────────────────────────────────────────
 app.include_router(chat.router)
 app.include_router(progress.router)
+app.include_router(documents.router)
+app.include_router(symbolic.router)
 
 from backend.src.api.v1 import quiz
 app.include_router(quiz.router, prefix="/api/v1/quiz", tags=["Quiz"])

@@ -46,6 +46,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.handwritten-math {
+  font-family: 'Kalam', cursive;
+  font-size: 1.25rem;
+  line-height: 1.6;
+}
+
 /* Glassmorphism Utility */
 .glass {
   background: var(--glass-bg);

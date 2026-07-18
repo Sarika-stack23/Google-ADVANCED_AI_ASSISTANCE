@@ -14,16 +14,32 @@ export const ProgressDashboard: React.FC = () => {
   const [stats, setStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
-    // In a real app, fetch from /api/v1/user/stats
-    // Mocking for now to simulate the UI
-    setTimeout(() => {
-      setStats({
-        streak: 12,
-        total_solved: 145,
-        accuracy: 82,
-        weak_topics: ["Quadratic Equations", "Trigonometric Identities"]
-      });
-    }, 500);
+    const fetchProgress = async () => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch('http://localhost:8080/api/v1/progress', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // accuracy and weak_topics can remain mocked for now, or computed
+          setStats({
+            streak: data.streak || 0,
+            total_solved: data.total_solved || 0,
+            accuracy: 85,
+            weak_topics: ["Quadratic Equations", "Trigonometry"]
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch progress", err);
+        // Fallback to mock if backend not reachable
+        setStats({ streak: 0, total_solved: 0, accuracy: 0, weak_topics: [] });
+      }
+    };
+    fetchProgress();
   }, [user]);
 
   if (!stats) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading dashboard...</div>;
