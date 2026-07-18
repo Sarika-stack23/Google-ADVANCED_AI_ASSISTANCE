@@ -49,14 +49,14 @@ class MathAIEngine:
     """Orchestrates RAG retrieval, symbolic math, and LLM calls for math tutoring."""
 
     def __init__(self, vector_store=None, session_id: str = "default"):
-        self.llm          = self._init_llm()
+        self.llm          = self._init_llm() if not settings.use_gemini else None
         self.vector_store = vector_store
         self.memory       = MongoDBChatMemory(session_id=session_id)
         self.symbolic     = SymbolicMathEngine()
         self.session_id   = session_id
 
     def _init_llm(self):
-        """Initialize the primary LLM model."""
+        """Initialize the fallback Groq LLM model."""
         return _get_llm(settings.groq_model_fallbacks[0])
 
     def _retrieve_context(self, query: str) -> Tuple[list, str]:
