@@ -163,9 +163,32 @@ class GeminiService:
                 if chunk.text:
                     yield chunk.text
         except Exception as e:
-            logger.error(f"Streaming error: {e}")
-            yield f"\n\n⚠️ Streaming error: {e}"
-
+            logger.error(f"Primary model {self.primary_model} streaming failed: {e}")
+            logger.info(f"Falling back to {self.fallback_model}...")
+            try:
+                response_stream = client.models.generate_content_stream(
+                    model=self.fallback_model,
+                    contents=prompt,
+                    config=config
+                )
+                for chunk in response_stream:
+                    if chunk.text:
+                        yield chunk.text
+            except Exception as e2:
+                logger.error(f"Fallback model {self.fallback_model} streaming also failed: {e2}")
+                logger.info("Falling back to gemini-1.5-flash-8b...")
+                try:
+                    response_stream = client.models.generate_content_stream(
+                        model="gemini-1.5-flash-8b",
+                        contents=prompt,
+                        config=config
+                    )
+                    for chunk in response_stream:
+                        if chunk.text:
+                            yield chunk.text
+                except Exception as e3:
+                    logger.error(f"All Gemini streaming models failed: {e3}")
+                    yield f"\n\n⚠️ Streaming error: All Gemini models failed. You might be out of API quota."
 
 class GeminiVisionService:
     """Gemini Vision for extracting math from images."""

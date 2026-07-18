@@ -127,20 +127,21 @@ async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends
 
         gemini = GeminiService()
 
+        import json
         async def generate():
             full_response = ""
             try:
                 async for chunk in gemini.stream(payload.query, context=context, chat_history=chat_history):
                     full_response += chunk
                     # Format as SSE
-                    yield f"data: {chunk}\n\n"
+                    yield f"data: {json.dumps({'content': chunk, 'type': 'token'})}\n\n"
                 
                 # Save full response to memory after streaming completes
                 engine.memory.add_message("assistant", full_response)
                 yield "data: [DONE]\n\n"
             except Exception as e:
                 logger.error(f"Streaming error: {e}")
-                yield f"data: ⚠️ Streaming error: {e}\n\n"
+                yield f"data: {json.dumps({'content': f'\\n\\n⚠️ Streaming error: {e}', 'type': 'token'})}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
