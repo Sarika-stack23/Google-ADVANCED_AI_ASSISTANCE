@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { MessageSquare, LayoutDashboard, BookOpen, LogOut, Calculator, LineChart } from 'lucide-react';
+import { MessageSquare, LayoutDashboard, BookOpen, LogOut, Calculator, LineChart, Menu, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ChatInterface } from './components/Chat/ChatInterface';
 import { ProgressDashboard } from './components/Dashboard/ProgressDashboard';
@@ -33,7 +33,7 @@ const Login: React.FC = () => {
 
 import { SettingsModal } from './components/SettingsModal';
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<{ isOpen: boolean, closeMenu: () => void }> = ({ isOpen, closeMenu }) => {
   const { logout, user } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   
@@ -51,13 +51,20 @@ const Sidebar: React.FC = () => {
   });
 
   return (
-    <div className="sidebar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem', padding: '0.5rem' }}>
-        <Calculator size={28} color="hsl(var(--accent-primary))" />
-        <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Math AI</h2>
-      </div>
-      
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+    <>
+      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', padding: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Calculator size={28} color="hsl(var(--accent-primary))" />
+            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Math AI</h2>
+          </div>
+          {/* Close button for mobile inside sidebar */}
+          <button className="btn btn-outline" onClick={closeMenu} style={{ display: isOpen ? 'flex' : 'none', border: 'none', padding: '4px' }}>
+            <X size={20} />
+          </button>
+        </div>
+        
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
         <NavLink to="/" style={navStyle} end>
           <MessageSquare size={20} /> Chat
         </NavLink>
@@ -79,22 +86,45 @@ const Sidebar: React.FC = () => {
         <button onClick={() => setIsSettingsOpen(true)} className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }}>
           ⚙️ Settings
         </button>
-        <button onClick={logout} className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }}>
+        <button onClick={() => { closeMenu(); logout(); }} className="btn btn-outline" style={{ width: '100%', justifyContent: 'flex-start' }}>
           <LogOut size={20} /> Sign out
         </button>
       </div>
       
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
+    {isOpen && (
+      <div className="mobile-menu-overlay" style={{ display: 'block' }} onClick={closeMenu} />
+    )}
+    </>
   );
 };
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="app-container">
-    <Sidebar />
-    {children}
-  </div>
-);
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  return (
+    <div className="app-container">
+      <Sidebar isOpen={isMobileMenuOpen} closeMenu={() => setIsMobileMenuOpen(false)} />
+      <div className="main-content" style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+        {/* Mobile Header with Hamburger Menu */}
+        <div className="mobile-header">
+          <button className="btn btn-outline" onClick={() => setIsMobileMenuOpen(true)} style={{ padding: '0.5rem', border: 'none' }}>
+            <Menu size={24} color="hsl(var(--text-primary))" />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: '0.5rem' }}>
+            <Calculator size={24} color="hsl(var(--accent-primary))" />
+            <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Math AI</span>
+          </div>
+        </div>
+        {/* Page Content */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   return (
