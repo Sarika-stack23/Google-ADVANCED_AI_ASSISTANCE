@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Ensure .env is loaded for local development
 from dotenv import load_dotenv
-load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent.parent / ".env", override=True)
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env", override=True)
 
 
 class Settings(BaseSettings):
