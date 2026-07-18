@@ -246,12 +246,21 @@ class GeminiVisionService:
         try:
             response = client.models.generate_content(
                 model=self.model_name,
-                contents=[
-                    prompt,
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                ],
+                contents=[prompt, types.Part.from_bytes(data=image_bytes, mime_type=mime_type)],
                 config=config
             )
+        except Exception as e:
+            logger.error(f"Primary vision model failed: {e}")
+            logger.info("Falling back to gemini-1.5-flash-8b for vision...")
+            try:
+                response = client.models.generate_content(
+                    model="gemini-1.5-flash-8b",
+                    contents=[prompt, types.Part.from_bytes(data=image_bytes, mime_type=mime_type)],
+                    config=config
+                )
+            except Exception as e2:
+                raise Exception(f"All vision models failed. You might be out of API quota. ({e2})")
+
             text = response.text.strip() if response.text else ""
 
             if "EXTRACTED:" in text and "SOLUTION:" in text:

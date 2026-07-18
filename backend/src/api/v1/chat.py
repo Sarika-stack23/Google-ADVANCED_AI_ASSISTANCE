@@ -141,7 +141,8 @@ async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends
                 yield "data: [DONE]\n\n"
             except Exception as e:
                 logger.error(f"Streaming error: {e}")
-                yield f"data: {json.dumps({'content': f'\\n\\n⚠️ Streaming error: {e}', 'type': 'token'})}\n\n"
+                err_msg = f"\n\n⚠️ Streaming error: {e}"
+                yield f"data: {json.dumps({'content': err_msg, 'type': 'token'})}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
