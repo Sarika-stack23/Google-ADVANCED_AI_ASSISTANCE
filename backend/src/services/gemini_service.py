@@ -210,12 +210,13 @@ class GeminiVisionService:
         prompt = (
             "You are a math OCR expert. Extract ALL mathematical content from this image.\n\n"
             "Rules:\n"
-            "1. Convert handwritten or printed math into clean text.\n"
-            "2. Use standard notation: x², √, π, ±, ∫, Σ, etc.\n"
-            "3. If it's an equation, write it as: equation\n"
-            "4. If it's a word problem, transcribe it exactly.\n"
-            "5. If there are multiple problems, number them.\n"
-            "6. Return ONLY the extracted math — no commentary.\n"
+            "1. If the image does NOT contain any math, physics, or quantitative concepts (e.g., it is a picture of a dog, car, person, or normal text), you MUST reply exactly with: REJECTED: This image does not appear to contain a math problem. Please upload a picture of a math question.\n"
+            "2. Convert handwritten or printed math into clean text.\n"
+            "3. Use standard notation: x², √, π, ±, ∫, Σ, etc.\n"
+            "4. If it's an equation, write it as: equation\n"
+            "5. If it's a word problem, transcribe it exactly.\n"
+            "6. If there are multiple problems, number them.\n"
+            "7. Return ONLY the extracted math — no commentary.\n"
         )
 
         config = types.GenerateContentConfig(safety_settings=_get_safety_settings())
@@ -241,6 +242,7 @@ class GeminiVisionService:
 
         prompt = (
             "You are an Indian math teacher. Look at this image.\n\n"
+            "IMPORTANT DOMAIN RULE: If the image does NOT contain a math problem, physics problem, or quantitative concept, you MUST ignore the steps below and respond exactly with: REJECTED: This image does not appear to contain a math problem. Please upload a picture of a math question.\n\n"
             "Step 1: Extract the math problem from the image.\n"
             "Step 2: Solve it step-by-step in whiteboard style.\n\n"
             "Format your response as:\n"
