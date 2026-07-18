@@ -21,10 +21,15 @@ logger = logging.getLogger("math_assistant.gemini")
 
 _GEMINI_CLIENT = None
 
-def _get_gemini_client():
+def _get_gemini_client(custom_api_key: str = None):
+    from google import genai
+    
+    # If a custom key is provided, always create a fresh client
+    if custom_api_key:
+        return genai.Client(api_key=custom_api_key)
+        
     global _GEMINI_CLIENT
     if _GEMINI_CLIENT is None:
-        from google import genai
         api_key = settings.gemini_api_key
         if not api_key:
             raise ValueError(
@@ -60,10 +65,11 @@ def _get_safety_settings():
 class GeminiService:
     """Google Gemini text-based math query service with automatic fallback."""
 
-    def __init__(self):
+    def __init__(self, custom_api_key: str = None):
         self.primary_model = settings.gemini_primary_model
         self.fallback_model = settings.gemini_fallback_model
         self.prompt_service = PromptService()
+        self.custom_api_key = custom_api_key
 
     def query(self, user_input: str, context: str = "", chat_history: list = None) -> str:
         """Send a math query to Gemini and return the response."""
@@ -86,7 +92,7 @@ class GeminiService:
 
         models_to_try = [self.primary_model, self.fallback_model]
         last_error = None
-        client = _get_gemini_client()
+        client = _get_gemini_client(self.custom_api_key)
 
         config = types.GenerateContentConfig(
             temperature=settings.gemini_temperature,
@@ -146,7 +152,7 @@ class GeminiService:
         parts.append(f"Student: {user_input}\nTeacher: ")
         prompt = "".join(parts)
 
-        client = _get_gemini_client()
+        client = _get_gemini_client(self.custom_api_key)
         config = types.GenerateContentConfig(
             temperature=settings.gemini_temperature,
             max_output_tokens=settings.gemini_max_tokens,
@@ -193,12 +199,13 @@ class GeminiService:
 class GeminiVisionService:
     """Gemini Vision for extracting math from images."""
 
-    def __init__(self):
+    def __init__(self, custom_api_key: str = None):
         self.model_name = settings.gemini_vision_model
+        self.custom_api_key = custom_api_key
 
     def extract_math_from_image(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
         from google.genai import types
-        client = _get_gemini_client()
+        client = _get_gemini_client(self.custom_api_key)
 
         prompt = (
             "You are a math OCR expert. Extract ALL mathematical content from this image.\n\n"
@@ -230,7 +237,7 @@ class GeminiVisionService:
 
     def extract_and_solve(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> Dict[str, str]:
         from google.genai import types
-        client = _get_gemini_client()
+        client = _get_gemini_client(self.custom_api_key)
 
         prompt = (
             "You are an Indian math teacher. Look at this image.\n\n"
