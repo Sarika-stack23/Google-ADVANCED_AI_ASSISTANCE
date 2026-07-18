@@ -156,7 +156,7 @@ export const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     const token = await user.getIdToken();
-    const sessionId = 'session-' + user.uid;
+    const customKey = localStorage.getItem('custom_gemini_api_key') || "";
 
     const assistantMsgId = (Date.now() + 1).toString();
     setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
@@ -166,9 +166,10 @@ export const ChatInterface: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Gemini-API-Key': customKey
         },
-        body: JSON.stringify({ query: userMsg.content, session_id: sessionId })
+        body: JSON.stringify({ query: userMsg.content, session_id: 'default' })
       });
 
       if (!response.body) throw new Error("No readable stream");

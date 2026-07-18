@@ -80,13 +80,15 @@ export const NCERTQuizPanel: React.FC = () => {
       const token = await user.getIdToken();
       
       const questionText = state.currentQuestionRaw.split(/Answer:/i)[0].trim();
+      const customKey = localStorage.getItem('custom_gemini_api_key') || "";
       
       // We send the query to the standard /chat/stream endpoint
       const response = await fetch(`http://localhost:8080/api/v1/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Gemini-API-Key': customKey
         },
         body: JSON.stringify({ 
             query: `Action: ${action}\nQuestion: ${questionText}`, 

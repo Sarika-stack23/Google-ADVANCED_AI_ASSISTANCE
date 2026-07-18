@@ -8,7 +8,7 @@ through the MathAIEngine (RAG + symbolic math + LLM with fallback).
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -103,47 +103,73 @@ async def chat(request: Request, payload: ChatRequest, uid: str = Depends(verify
 
 @router.post("/chat/stream")
 @limiter.limit("20/minute")
-async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends(verify_firebase_token)):
-    """Stream a math solution token-by-token using SSE.
-    
-    Requires USE_GEMINI=true to function correctly.
+async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends(verify_firebase_token), x_gemini_api_key: Optional[str] = Header(None)):
     """
-    if not settings.use_gemini:
-        raise HTTPException(status_code=400, detail="Streaming requires Gemini API to be enabled.")
+    Stream a response from the AI Engine to the frontend using SSE.
+    """
 
     from backend.src.services.gemini_service import GeminiService
     from backend.src.services.memory_service import MongoDBChatMemory
 
     try:
-        # We manually orchestrate the context retrieval for streaming
         store = build_pipeline()
         engine = MathAIEngine(vector_store=store, session_id=payload.session_id)
         engine.memory.uid = uid
         
-        # 1. Get context and history
         source_docs, context = engine._retrieve_context(payload.query)
         chat_history = engine.memory.get_langchain_messages(limit=4)
         engine.memory.add_message("human", payload.query)
 
-        gemini = GeminiService()
+        gemini = GeminiService(custom_api_key=x_gemini_api_key)
 
         import json
         async def generate():
             full_response = ""
             try:
+                if not settings.use_gemini and not x_gemini_api_key:
+                    raise Exception("Gemini is disabled via USE_GEMINI=false. Bypassing to fallback.")
+                    
                 async for chunk in gemini.stream(payload.query, context=context, chat_history=chat_history):
                     full_response += chunk
-                    # Format as SSE
                     yield f"data: {json.dumps({'content': chunk, 'type': 'token'})}\n\n"
                 
-                # Save full response to memory after streaming completes
                 engine.memory.add_message("assistant", full_response)
                 yield "data: [DONE]\n\n"
             except Exception as e:
-                logger.error(f"Streaming error: {e}")
-                err_msg = f"\n\n⚠️ Streaming error: {e}"
-                yield f"data: {json.dumps({'content': err_msg, 'type': 'token'})}\n\n"
-                yield "data: [DONE]\n\n"
+                logger.error(f"Gemini Streaming error: {e}. Falling back to Groq...")
+                
+                try:
+                    engine.llm = engine._init_llm() # Initialize Groq
+                    
+                    # Build simple prompt for Groq fallback
+                    system_text = "You are an advanced AI math tutor."
+                    parts = [{"role": "system", "content": system_text}]
+                    if context:
+                        parts.append({"role": "system", "content": f"Context: {context}"})
+                    for msg in chat_history:
+                        parts.append({"role": msg.type, "content": msg.content})
+                    parts.append({"role": "user", "content": payload.query})
+                    
+                    from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+                    langchain_msgs = []
+                    for p in parts:
+                        if p["role"] == "system": langchain_msgs.append(SystemMessage(content=p["content"]))
+                        elif p["role"] == "user" or p["role"] == "human": langchain_msgs.append(HumanMessage(content=p["content"]))
+                        else: langchain_msgs.append(AIMessage(content=p["content"]))
+
+                    async for chunk in engine.llm.astream(langchain_msgs):
+                        if chunk.content:
+                            full_response += chunk.content
+                            yield f"data: {json.dumps({'content': chunk.content, 'type': 'token'})}\n\n"
+                    
+                    engine.memory.add_message("assistant", full_response)
+                    yield "data: [DONE]\n\n"
+                    
+                except Exception as e2:
+                    logger.error(f"Groq Streaming error: {e2}")
+                    err_msg = f"\n\n⚠️ Streaming error: All Gemini and Groq models failed. API quotas might be exhausted."
+                    yield f"data: {json.dumps({'content': err_msg, 'type': 'token'})}\n\n"
+                    yield "data: [DONE]\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -154,14 +180,14 @@ async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends
 
 @router.post("/vision/extract", response_model=VisionResponse)
 @limiter.limit("20/minute")
-async def extract_math_from_image(request: Request, file: UploadFile = File(...), solve: bool = Form(False), uid: str = Depends(verify_firebase_token)):
+async def extract_math_from_image(request: Request, file: UploadFile = File(...), solve: bool = Form(False), uid: str = Depends(verify_firebase_token), x_gemini_api_key: Optional[str] = Header(None)):
     """Extract math from an uploaded image using Gemini Vision."""
     if not settings.use_gemini:
         raise HTTPException(status_code=400, detail="Vision extraction requires Gemini API.")
 
     try:
         image_bytes = await file.read()
-        vision_service = GeminiVisionService()
+        vision_service = GeminiVisionService(custom_api_key=x_gemini_api_key)
         
         if solve:
             result = vision_service.extract_and_solve(image_bytes, mime_type=file.content_type)

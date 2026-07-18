@@ -49,7 +49,12 @@ class MathAIEngine:
     """Orchestrates RAG retrieval, symbolic math, and LLM calls for math tutoring."""
 
     def __init__(self, vector_store=None, session_id: str = "default"):
-        self.llm          = self._init_llm() if not settings.use_gemini else None
+        try:
+            self.llm = self._init_llm() if not settings.use_gemini else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize Groq LLM: {e}")
+            self.llm = None
+            
         self.vector_store = vector_store
         self.memory       = MongoDBChatMemory(session_id=session_id)
         self.symbolic     = SymbolicMathEngine()
