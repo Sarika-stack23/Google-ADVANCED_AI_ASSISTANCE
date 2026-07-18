@@ -98,6 +98,9 @@ class QdrantService:
     ) -> List[Any]:
         """Hybrid search with metadata filtering."""
         
+        if not self.vectorstore:
+            return []
+            
         from qdrant_client.http import models as rest
         
         filter_conditions = []
@@ -119,6 +122,10 @@ class QdrantService:
         except Exception as e:
             logger.error(f"Qdrant search failed: {e}")
             return []
+
+    def is_ready(self) -> bool:
+        """Check if the vector store is initialized and ready."""
+        return self.vectorstore is not None
 
     def as_retriever(self, k: int = 5, metadata_filters: Dict[str, Any] = None):
         """Return a LangChain retriever interface with dynamic filters."""
