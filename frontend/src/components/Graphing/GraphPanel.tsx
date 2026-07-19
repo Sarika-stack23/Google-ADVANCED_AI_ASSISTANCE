@@ -65,7 +65,7 @@ export const GraphPanel: React.FC = () => {
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="btn btn-outline" onClick={async () => {
                     try {
-                        const res = await fetch('http://localhost:8080/api/v1/symbolic', {
+                        const res = await fetch(import.meta.env.VITE_API_URL + '/api/v1/symbolic', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ expression: expression, operation: 'differentiate' })
@@ -76,7 +76,7 @@ export const GraphPanel: React.FC = () => {
                 }}>d/dx</button>
                 <button className="btn btn-outline" onClick={async () => {
                     try {
-                        const res = await fetch('http://localhost:8080/api/v1/symbolic', {
+                        const res = await fetch(import.meta.env.VITE_API_URL + '/api/v1/symbolic', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ expression: expression, operation: 'integrate' })
@@ -87,7 +87,7 @@ export const GraphPanel: React.FC = () => {
                 }}>∫ dx</button>
                 <button className="btn btn-outline" onClick={async () => {
                     try {
-                        const res = await fetch('http://localhost:8080/api/v1/symbolic', {
+                        const res = await fetch(import.meta.env.VITE_API_URL + '/api/v1/symbolic', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ expression: expression, operation: 'solve' })

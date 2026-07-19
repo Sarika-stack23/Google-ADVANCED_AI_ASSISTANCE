@@ -39,7 +39,7 @@ export const NCERTQuizPanel: React.FC = () => {
 
   useEffect(() => {
     // Fetch quiz tree on mount
-    fetch('http://localhost:8080/api/v1/quiz/structure')
+    fetch(import.meta.env.VITE_API_URL + '/api/v1/quiz/structure')
       .then(r => r.json())
       .then(data => {
         setState(prev => {
@@ -75,7 +75,7 @@ export const NCERTQuizPanel: React.FC = () => {
     const token = await user.getIdToken();
     const trackWeakness = async () => {
         try {
-            await fetch('http://localhost:8080/api/v1/progress/weakness', {
+            await fetch(import.meta.env.VITE_API_URL + '/api/v1/progress/weakness', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ topic: state.selectedChapter })
@@ -85,7 +85,7 @@ export const NCERTQuizPanel: React.FC = () => {
     
     const trackAccuracy = async (correct: boolean) => {
         try {
-            await fetch('http://localhost:8080/api/v1/progress/accuracy', {
+            await fetch(import.meta.env.VITE_API_URL + '/api/v1/progress/accuracy', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ correct })
@@ -95,7 +95,7 @@ export const NCERTQuizPanel: React.FC = () => {
     
     const incrementProgress = async () => {
         try {
-            await fetch('http://localhost:8080/api/v1/progress/increment', {
+            await fetch(import.meta.env.VITE_API_URL + '/api/v1/progress/increment', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -138,7 +138,7 @@ export const NCERTQuizPanel: React.FC = () => {
       const customKey = localStorage.getItem('custom_gemini_api_key') || "";
       
       // We send the query to the standard /chat/stream endpoint
-      const response = await fetch(`http://localhost:8080/api/v1/chat/stream`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

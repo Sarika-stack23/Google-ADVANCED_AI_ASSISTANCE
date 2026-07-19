@@ -63,7 +63,7 @@ export const ChatInterface: React.FC = () => {
     if (!user) return;
     try {
       const token = await user.getIdToken();
-      await fetch('http://localhost:8080/api/v1/progress/increment', {
+      await fetch(import.meta.env.VITE_API_URL + '/api/v1/progress/increment', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -99,7 +99,7 @@ export const ChatInterface: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8080/api/v1/documents/upload', {
+      const response = await fetch(import.meta.env.VITE_API_URL + '/api/v1/documents/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -171,7 +171,7 @@ export const ChatInterface: React.FC = () => {
               const formData = new FormData();
               formData.append('file', file);
               formData.append('solve', 'true');
-              const response = await fetch('http://localhost:8080/api/v1/vision/extract', {
+              const response = await fetch(import.meta.env.VITE_API_URL + '/api/v1/vision/extract', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -216,7 +216,7 @@ export const ChatInterface: React.FC = () => {
     setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
 
     try {
-      const response = await fetch('http://localhost:8080/api/v1/chat/stream', {
+      const response = await fetch(import.meta.env.VITE_API_URL + '/api/v1/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +299,7 @@ export const ChatInterface: React.FC = () => {
       formData.append('file', file);
       formData.append('solve', 'true');
 
-      const response = await fetch('http://localhost:8080/api/v1/vision/extract', {
+      const response = await fetch(import.meta.env.VITE_API_URL + '/api/v1/vision/extract', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData

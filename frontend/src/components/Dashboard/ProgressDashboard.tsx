@@ -19,7 +19,7 @@ export const ProgressDashboard: React.FC = () => {
       if (!user) return;
       try {
         const token = await user.getIdToken();
-        const response = await fetch('http://localhost:8080/api/v1/progress', {
+        const response = await fetch(import.meta.env.VITE_API_URL + '/api/v1/progress', {
           headers: {
             'Authorization': `Bearer ${token}`
           }

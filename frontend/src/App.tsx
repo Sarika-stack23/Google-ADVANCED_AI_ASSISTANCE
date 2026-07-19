@@ -15,7 +15,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const Login: React.FC = () => {
-  const { signInWithGoogle, user } = useAuth();
+  const { signInWithGoogle, user, error } = useAuth();
   if (user) return <Navigate to="/" />;
   return (
     <div className="login-container">
@@ -34,7 +34,13 @@ const Login: React.FC = () => {
           Your intelligent, personalized mathematics tutor powered by advanced AI.
         </p>
 
-        <button className="google-btn" onClick={signInWithGoogle}>
+        {error && (
+          <div style={{ width: '100%', padding: '0.75rem', backgroundColor: 'hsla(0, 84%, 60%, 0.1)', border: '1px solid hsl(var(--danger))', color: 'hsl(var(--danger))', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+            {error}
+          </div>
+        )}
+
+        <button type="button" className="google-btn" onClick={signInWithGoogle}>
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo" />
           Continue with Google
         </button>
