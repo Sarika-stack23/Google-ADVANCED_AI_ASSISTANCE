@@ -231,7 +231,7 @@ export const NCERTQuizPanel: React.FC = () => {
   const displayQuestion = state.currentQuestionRaw.split(/Answer:/i)[0].trim();
 
   return (
-    <div className="main-content" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%', overflowY: 'auto', height: '100vh', boxSizing: 'border-box' }}>
+    <div className="main-content" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
       <h2>📚 NCERT Practice</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Select a class, chapter, and exercise to practice NCERT questions.</p>
       
@@ -258,13 +258,13 @@ export const NCERTQuizPanel: React.FC = () => {
           </select>
       </div>
       
-      <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem', minHeight: '150px' }}>
-        <p style={{ fontSize: '1.2rem', lineHeight: '1.5', margin: 0 }}>
+      <div className="glass" style={{ padding: '2rem', marginBottom: '1.5rem', minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{ fontSize: '1.3rem', lineHeight: '1.6', width: '100%' }}>
           {displayQuestion ? <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{displayQuestion}</ReactMarkdown> : <i>Loading questions or none available...</i>}
-        </p>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
         <button className="btn btn-outline" onClick={() => handleAction('Give me a small hint to start solving this')} disabled={isLoading || !displayQuestion}>💡 Hint</button>
         <button className="btn btn-outline" onClick={() => handleAction('Show me the first step to solve this')} disabled={isLoading || !displayQuestion}>📖 Steps</button>
         <button className="btn btn-primary" onClick={() => handleAction('Show me the full answer for this')} disabled={isLoading || !displayQuestion}>✅ Answer</button>
