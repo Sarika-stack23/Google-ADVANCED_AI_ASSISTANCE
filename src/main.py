@@ -72,6 +72,7 @@ app.add_middleware(
         "http://localhost:3000",      # React dev server
         "http://localhost:5173",      # Vite dev server
         "http://localhost:8501",      # Streamlit
+        "https://advanced-math-ai.vercel.app", # Vercel production
     ],
     allow_credentials=True,
     allow_methods=["*"],
