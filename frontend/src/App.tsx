@@ -18,15 +18,31 @@ const Login: React.FC = () => {
   const { signInWithGoogle, user } = useAuth();
   if (user) return <Navigate to="/" />;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '2rem' }}>
-      <div style={{ textAlign: 'center' }}>
-        <Calculator size={48} style={{ color: 'hsl(var(--accent-primary))', marginBottom: '1rem' }} />
-        <h1>Advanced Math Assistant</h1>
-        <p style={{ color: 'hsl(var(--text-secondary))', marginTop: '0.5rem' }}>Your personal AI math tutor</p>
+    <div className="login-container">
+      <div className="login-mesh"></div>
+      
+      <div className="login-card">
+        <div style={{ padding: '1rem', background: 'hsla(var(--accent-primary), 0.1)', borderRadius: '50%', marginBottom: '1.5rem' }}>
+          <Calculator size={48} style={{ color: 'hsl(var(--accent-primary))' }} />
+        </div>
+        
+        <h1 style={{ fontSize: '2.2rem', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>
+          Welcome to <span className="text-gradient">Math AI</span>
+        </h1>
+        
+        <p style={{ color: 'hsl(var(--text-secondary))', fontSize: '1.1rem', marginBottom: '2rem' }}>
+          Your intelligent, personalized mathematics tutor powered by advanced AI.
+        </p>
+
+        <button className="google-btn" onClick={signInWithGoogle}>
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google logo" />
+          Continue with Google
+        </button>
+        
+        <div style={{ marginTop: '2rem', fontSize: '0.85rem', color: 'hsl(var(--text-secondary))', opacity: 0.8 }}>
+          By continuing, you agree to our Terms of Service and Privacy Policy.
+        </div>
       </div>
-      <button className="btn btn-primary" onClick={signInWithGoogle} style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
-        Sign in with Google
-      </button>
     </div>
   );
 };
