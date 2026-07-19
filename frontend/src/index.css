@@ -50,6 +50,7 @@ body {
   font-family: 'Kalam', cursive;
   font-size: 1.25rem;
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 /* Glassmorphism Utility */

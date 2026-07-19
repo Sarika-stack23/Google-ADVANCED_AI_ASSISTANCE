@@ -284,3 +284,16 @@ class GeminiVisionService:
         except Exception as e:
             logger.error(f"Extract and solve error: {e}")
             return {"extracted": "", "solution": f"⚠️ Error: {e}"}
+
+class GroqVisionService:
+    def __init__(self):
+        # Groq has decommissioned their vision models. We provide a mock fallback for local testing.
+        pass
+        
+    def extract_math_from_image(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+        return "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\n\n(Note: This is a mock response because Groq vision models are currently offline. Please add a Gemini API Key to use real vision extraction.)"
+
+    def extract_and_solve(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> Dict[str, str]:
+        extracted = "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"
+        solution = "To solve this, we use the quadratic formula...\n\n(Note: This is a mock response because Groq vision models are currently offline. Please add a Gemini API Key to use real vision extraction.)"
+        return {"extracted": extracted, "solution": solution}

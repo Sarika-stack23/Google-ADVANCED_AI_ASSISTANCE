@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import Latex from 'react-latex-next';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
 interface QuizState {
@@ -27,6 +29,13 @@ export const NCERTQuizPanel: React.FC = () => {
     showStuckMenu: false
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(state.feedback);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     // Fetch quiz tree on mount
@@ -62,10 +71,41 @@ export const NCERTQuizPanel: React.FC = () => {
   const handleAction = async (action: string) => {
     if (!user) return;
     setIsLoading(true);
+
+    const token = await user.getIdToken();
+    const trackWeakness = async () => {
+        try {
+            await fetch('http://localhost:8080/api/v1/progress/weakness', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic: state.selectedChapter })
+            });
+        } catch (e) { console.error(e); }
+    };
+    
+    const trackAccuracy = async (correct: boolean) => {
+        try {
+            await fetch('http://localhost:8080/api/v1/progress/accuracy', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ correct })
+            });
+        } catch (e) { console.error(e); }
+    };
+    
+    const incrementProgress = async () => {
+        try {
+            await fetch('http://localhost:8080/api/v1/progress/increment', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } catch (e) { console.error(e); }
+    };
     
     // If asking for 'answer', we already have it parsed from the raw markdown
-    if (action.includes('Show me the full answer for this')) {
+    if (action.includes('Show me the full answer for this') || action.includes('Show me the full step-by-step answer')) {
         const parts = state.currentQuestionRaw.split(/Answer:/i);
+        incrementProgress();
         if (parts.length > 1) {
             setState(prev => ({ ...prev, feedback: "**Answer:** " + parts[1].trim(), showStuckMenu: false }));
             setIsLoading(false);
@@ -74,6 +114,21 @@ export const NCERTQuizPanel: React.FC = () => {
             // Some questions might not have an "Answer:" block, so we fall back to AI
             action = 'Solve this problem and show the final answer';
         }
+    }
+    
+    if (action.toLowerCase().includes('hint') || action.toLowerCase().includes('step') || action.includes("I don't understand") || action.includes('explain the underlying concept') || action.includes('break down the formula')) {
+        trackWeakness();
+    }
+    
+    if (action === 'I understood it, thanks!') {
+        trackAccuracy(true);
+        incrementProgress();
+        setState(prev => ({ ...prev, feedback: "Great job! Keep up the good work. 💪", showStuckMenu: false }));
+        setIsLoading(false);
+        return;
+    } else if (action === 'I still have a doubt, can you explain further?') {
+        trackAccuracy(false);
+        trackWeakness();
     }
 
     try {
@@ -205,7 +260,7 @@ export const NCERTQuizPanel: React.FC = () => {
       
       <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem', minHeight: '150px' }}>
         <p style={{ fontSize: '1.2rem', lineHeight: '1.5', margin: 0 }}>
-          {displayQuestion ? <Latex>{displayQuestion}</Latex> : <i>Loading questions or none available...</i>}
+          {displayQuestion ? <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{displayQuestion}</ReactMarkdown> : <i>Loading questions or none available...</i>}
         </p>
       </div>
 
@@ -232,12 +287,12 @@ export const NCERTQuizPanel: React.FC = () => {
         <div className="glass animate-fade-in" style={{ padding: '1.5rem', backgroundColor: 'hsla(var(--accent-primary), 0.1)', border: '1px solid hsla(var(--accent-primary), 0.2)', marginBottom: '3rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
              <h4>AI Response</h4>
-             <button title="Copy Solution" onClick={() => navigator.clipboard.writeText(state.feedback)} style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.6, cursor: 'pointer' }}>
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+             <button title="Copy Solution" onClick={handleCopy} style={{ background: 'transparent', border: 'none', color: copied ? 'var(--success)' : 'inherit', opacity: copied ? 1 : 0.6, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '4px' }}>
+               {copied ? <span style={{ fontSize: '0.75rem' }}>Copied!</span> : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>}
              </button>
           </div>
           <div className="handwritten-math">
-            <Latex>{state.feedback}</Latex>
+            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{state.feedback}</ReactMarkdown>
           </div>
           
           {!isLoading && (

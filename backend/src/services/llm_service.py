@@ -27,21 +27,81 @@ logger = logging.getLogger("math_assistant.llm")
 _LLM_CACHE = {}
 
 
+class GroqLLMWrapper:
+    """Wrapper around native Groq client to mimic Langchain's invoke() and astream() methods."""
+    def __init__(self, api_key: str, model_name: str):
+        from groq import Groq, AsyncGroq
+        self.client = Groq(api_key=api_key)
+        self.async_client = AsyncGroq(api_key=api_key)
+        self.model_name = model_name
+        
+    def invoke(self, messages):
+        from langchain_core.messages import AIMessage
+        groq_msgs = []
+        
+        # If it's just a single string prompt
+        if isinstance(messages, str):
+            groq_msgs.append({"role": "user", "content": messages})
+        elif isinstance(messages, list):
+            for m in messages:
+                if isinstance(m, str):
+                    groq_msgs.append({"role": "user", "content": m})
+                elif isinstance(m, dict):
+                    # In case it's a raw dict
+                    groq_msgs.append(m)
+                else:
+                    role = "user" if getattr(m, "type", "user") == "human" else getattr(m, "type", "user")
+                    content = m.content if isinstance(m.content, str) else str(m.content)
+                    groq_msgs.append({"role": role, "content": content})
+                    
+        chat_completion = self.client.chat.completions.create(
+            messages=groq_msgs,
+            model=self.model_name,
+            temperature=0.1,
+            max_tokens=2048,
+        )
+        
+        return AIMessage(content=chat_completion.choices[0].message.content)
+
+    async def astream(self, messages):
+        from langchain_core.messages import AIMessageChunk
+        groq_msgs = []
+        
+        if isinstance(messages, str):
+            groq_msgs.append({"role": "user", "content": messages})
+        elif isinstance(messages, list):
+            for m in messages:
+                if isinstance(m, str):
+                    groq_msgs.append({"role": "user", "content": m})
+                elif isinstance(m, dict):
+                    groq_msgs.append(m)
+                else:
+                    role = "user" if getattr(m, "type", "user") == "human" else getattr(m, "type", "user")
+                    content = m.content if isinstance(m.content, str) else str(m.content)
+                    groq_msgs.append({"role": role, "content": content})
+                    
+        stream = await self.async_client.chat.completions.create(
+            messages=groq_msgs,
+            model=self.model_name,
+            temperature=0.1,
+            max_tokens=2048,
+            stream=True
+        )
+        
+        async for chunk in stream:
+            content = chunk.choices[0].delta.content
+            if content is not None:
+                yield AIMessageChunk(content=content)
+
 def _get_llm(model=None):
     """Get or create a cached Groq LLM instance for a given model name."""
     key = model or settings.groq_model_fallbacks[0]
     if key not in _LLM_CACHE:
-        from langchain_groq import ChatGroq
         api_key = settings.groq_api_key
         if not api_key:
             raise ValueError("GROQ_API_KEY not set. Add it to your .env file.")
-        logger.info(f"Initializing Groq LLM: {key}")
-        _LLM_CACHE[key] = ChatGroq(
-            groq_api_key=api_key,
-            model_name=key,
-            temperature=0.1,
-            max_tokens=2048,
-        )
+        logger.info(f"Initializing Native Groq LLM: {key}")
+        _LLM_CACHE[key] = GroqLLMWrapper(api_key=api_key, model_name=key)
     return _LLM_CACHE[key]
 
 

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Flame, Trophy, CheckCircle, XCircle } from 'lucide-react';
+import { Flame, Trophy, CheckCircle, BookOpen, Star } from 'lucide-react';
 
 interface UserStats {
   streak: number;
   total_solved: number;
   accuracy: number;
   weak_topics: string[];
+  activity_map: Record<string, number>;
 }
 
 export const ProgressDashboard: React.FC = () => {
@@ -25,18 +26,18 @@ export const ProgressDashboard: React.FC = () => {
         });
         if (response.ok) {
           const data = await response.json();
-          // accuracy and weak_topics can remain mocked for now, or computed
           setStats({
             streak: data.streak || 0,
             total_solved: data.total_solved || 0,
-            accuracy: 85,
-            weak_topics: ["Quadratic Equations", "Trigonometry"]
+            accuracy: data.accuracy ?? 100,
+            weak_topics: data.weak_topics || [],
+            activity_map: data.activity_map || {}
           });
         }
       } catch (err) {
         console.error("Failed to fetch progress", err);
         // Fallback to mock if backend not reachable
-        setStats({ streak: 0, total_solved: 0, accuracy: 0, weak_topics: [] });
+        setStats({ streak: 0, total_solved: 0, accuracy: 0, weak_topics: [], activity_map: {} });
       }
     };
     fetchProgress();
@@ -78,33 +79,50 @@ export const ProgressDashboard: React.FC = () => {
             <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{stats.accuracy}%</div>
           </div>
         </div>
+
+        <div className="glass" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ backgroundColor: 'hsla(280, 91%, 60%, 0.1)', padding: '1rem', borderRadius: '50%', color: '#a855f7' }}>
+            <Star size={32} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.9rem', color: 'hsl(var(--text-secondary))' }}>Total Score</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{(stats.total_solved * 100) + (stats.streak * 50)}</div>
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="glass" style={{ padding: '1.5rem' }}>
           <h3 style={{ marginBottom: '1rem' }}>Activity Heatmap</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem' }}>
-            {/* Mock calendar squares */}
-            {Array.from({ length: 28 }).map((_, i) => (
-              <div key={i} style={{ 
-                aspectRatio: '1', 
-                backgroundColor: Math.random() > 0.3 ? 'hsl(var(--success))' : 'hsl(var(--bg-secondary))',
-                borderRadius: '4px',
-                opacity: Math.random() > 0.5 ? 1 : 0.4
-              }}></div>
-            ))}
+            {Array.from({ length: 28 }).map((_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() - (27 - i));
+              const dateStr = d.toISOString().split('T')[0];
+              const count = stats.activity_map[dateStr] || 0;
+              return (
+                <div key={i} title={`${dateStr}: ${count} solved`} style={{ 
+                  aspectRatio: '1', 
+                  backgroundColor: count > 0 ? 'hsl(var(--success))' : 'hsl(var(--bg-secondary))',
+                  borderRadius: '4px',
+                  opacity: count > 0 ? Math.min(1, 0.4 + (count * 0.15)) : 0.5
+                }}></div>
+              );
+            })}
           </div>
         </div>
 
         <div className="glass" style={{ padding: '1.5rem' }}>
           <h3 style={{ marginBottom: '1rem' }}>Topics to Review</h3>
           <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {stats.weak_topics.map((topic, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'hsla(0, 84%, 60%, 0.1)', color: 'hsl(var(--danger))', borderRadius: 'var(--radius)' }}>
-                <XCircle size={20} />
+            {stats.weak_topics.length > 0 ? stats.weak_topics.map((topic, i) => (
+              <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'hsla(217, 91%, 60%, 0.1)', color: 'hsl(var(--accent-primary))', borderRadius: 'var(--radius)' }}>
+                <BookOpen size={20} />
                 <span style={{ fontWeight: 500 }}>{topic}</span>
               </li>
-            ))}
+            )) : (
+              <p style={{ color: 'var(--text-secondary)' }}>You don't have any weak topics yet! Keep solving problems.</p>
+            )}
           </ul>
         </div>
       </div>

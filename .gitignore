@@ -48,4 +48,4 @@ build/
 # ── Frontend ───────────────────────────────────────────────
 node_modules/
 .firebase/
-frontend/dist/
+frontend/dist/test_math.jpg

@@ -141,8 +141,10 @@ async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends
                 try:
                     engine.llm = engine._init_llm() # Initialize Groq
                     
-                    # Build simple prompt for Groq fallback
-                    system_text = "You are an advanced AI math tutor."
+                    from backend.src.config import SYSTEM_TEMPLATE
+                    
+                    # Build simple prompt for Groq fallback using the master system template
+                    system_text = SYSTEM_TEMPLATE
                     parts = [{"role": "system", "content": system_text}]
                     if context:
                         parts.append({"role": "system", "content": f"Context: {context}"})
@@ -181,13 +183,15 @@ async def chat_stream(request: Request, payload: ChatRequest, uid: str = Depends
 @router.post("/vision/extract", response_model=VisionResponse)
 @limiter.limit("20/minute")
 async def extract_math_from_image(request: Request, file: UploadFile = File(...), solve: bool = Form(False), uid: str = Depends(verify_firebase_token), x_gemini_api_key: Optional[str] = Header(None)):
-    """Extract math from an uploaded image using Gemini Vision."""
-    if not settings.use_gemini:
-        raise HTTPException(status_code=400, detail="Vision extraction requires Gemini API.")
-
+    """Extract math from an uploaded image using Vision models."""
     try:
         image_bytes = await file.read()
-        vision_service = GeminiVisionService(custom_api_key=x_gemini_api_key)
+        
+        if settings.use_gemini or x_gemini_api_key:
+            vision_service = GeminiVisionService(custom_api_key=x_gemini_api_key)
+        else:
+            from backend.src.services.gemini_service import GroqVisionService
+            vision_service = GroqVisionService()
         
         if solve:
             result = vision_service.extract_and_solve(image_bytes, mime_type=file.content_type)
