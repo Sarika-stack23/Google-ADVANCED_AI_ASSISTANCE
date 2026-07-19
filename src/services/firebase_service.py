@@ -30,16 +30,21 @@ def init_firebase():
     from firebase_admin import credentials
     from firebase_admin import firestore
 
-    cred_path = settings.firebase_credentials_path
-    if not cred_path or not os.path.exists(cred_path):
-        logger.warning(
-            f"Firebase credentials not found at {cred_path}. "
-            "Running in unauthenticated/memory-fallback mode."
-        )
-        return
-
     try:
-        cred = credentials.Certificate(cred_path)
+        if os.environ.get("FIREBASE_KEY_JSON"):
+            import json
+            cred_dict = json.loads(os.environ.get("FIREBASE_KEY_JSON"))
+            cred = credentials.Certificate(cred_dict)
+        else:
+            cred_path = settings.firebase_credentials_path
+            if not cred_path or not os.path.exists(cred_path):
+                logger.warning(
+                    f"Firebase credentials not found. "
+                    "Running in unauthenticated/memory-fallback mode."
+                )
+                return
+            cred = credentials.Certificate(cred_path)
+
         _FIREBASE_APP = firebase_admin.initialize_app(cred)
         _FIRESTORE_CLIENT = firestore.client()
         logger.info("Firebase Admin SDK initialized successfully.")
