@@ -40,7 +40,7 @@ export const GraphPanel: React.FC = () => {
   };
 
   return (
-    <div className="main-content" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', width: '100%', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="main-content" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <h2 style={{ marginBottom: '1.5rem' }}>📈 Interactive Graphing</h2>
       
       <div className="glass" style={{ padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>

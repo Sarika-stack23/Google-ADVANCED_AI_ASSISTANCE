@@ -231,7 +231,7 @@ export const NCERTQuizPanel: React.FC = () => {
   const displayQuestion = state.currentQuestionRaw.split(/Answer:/i)[0].trim();
 
   return (
-    <div className="main-content" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', width: '100%', overflowY: 'auto', height: '100vh', boxSizing: 'border-box' }}>
+    <div className="main-content" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%', overflowY: 'auto', height: '100vh', boxSizing: 'border-box' }}>
       <h2>📚 NCERT Practice</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Select a class, chapter, and exercise to practice NCERT questions.</p>
       

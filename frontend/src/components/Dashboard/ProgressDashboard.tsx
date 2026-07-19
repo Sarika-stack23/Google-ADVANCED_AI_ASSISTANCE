@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Flame, Trophy, CheckCircle, BookOpen, Star } from 'lucide-react';
-
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 interface UserStats {
   streak: number;
   total_solved: number;
@@ -50,8 +50,19 @@ export const ProgressDashboard: React.FC = () => {
 
   if (!stats) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading dashboard...</div>;
 
+  const chartData = Array.from({ length: 14 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (13 - i));
+    const dateStr = d.toISOString().split('T')[0];
+    const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return {
+      date: shortDate,
+      solved: stats.activity_map[dateStr] || 0
+    };
+  });
+
   return (
-    <div className="main-content" style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+    <div className="main-content" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
       <h2 style={{ marginBottom: '2rem' }}>Learning Progress</h2>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -129,6 +140,24 @@ export const ProgressDashboard: React.FC = () => {
               <p style={{ color: 'var(--text-secondary)' }}>You don't have any weak topics yet! Keep solving problems.</p>
             )}
           </ul>
+        </div>
+      </div>
+
+      <div className="glass" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+        <h3 style={{ marginBottom: '1.5rem' }}>Problems Solved (Last 14 Days)</h3>
+        <div style={{ width: '100%', height: 300 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <XAxis dataKey="date" stroke="rgba(255,255,255,0.5)" />
+              <YAxis stroke="rgba(255,255,255,0.5)" allowDecimals={false} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'hsl(var(--bg-primary))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                itemStyle={{ color: 'hsl(var(--accent-primary))' }}
+              />
+              <Line type="monotone" dataKey="solved" name="Questions Solved" stroke="hsl(var(--accent-primary))" strokeWidth={3} dot={{ r: 4, fill: 'hsl(var(--accent-primary))' }} activeDot={{ r: 8 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
