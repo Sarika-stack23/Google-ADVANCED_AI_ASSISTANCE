@@ -23,17 +23,15 @@ services:
       retries: 3
       start_period: 60s
 
-  # ── Streamlit Frontend (existing UI) ─────────────────────────────────
-  streamlit:
+  # ── React Frontend (Vite Dev Server) ─────────────────────────────────
+  frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.streamlit
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "8501:8501"
-    env_file:
-      - .env
+      - "5173:5173"
     environment:
-      - API_URL=http://api:8080
+      - VITE_API_URL=http://api:8080
     depends_on:
       api:
         condition: service_healthy

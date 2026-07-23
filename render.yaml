@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: math-assistant-backend
+    name: agentic-math-solver-api
     env: python
     buildCommand: "cd backend && pip install -r requirements.txt"
     startCommand: "uvicorn backend.src.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -13,5 +14,9 @@ services:
         sync: false
       - key: USE_GEMINI
         value: "true"
-      - key: MONGODB_URI
+      - key: USE_FIREBASE
+        value: "true"
+      - key: FIREBASE_CREDENTIALS_PATH
         sync: false
+      - key: ENVIRONMENT
+        value: "production"
